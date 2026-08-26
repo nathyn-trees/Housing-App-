@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "npm run db:generate",
     "dev:web": "npm run dev --workspace=apps/web",
     "build:web": "npm run build --workspace=apps/web",
     "dev:mobile": "npm run start --workspace=apps/mobile",

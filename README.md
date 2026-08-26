@@ -52,7 +52,7 @@ apps/
   web/      Next.js 14 (App Router) — web UI + the REST API both clients use
   mobile/   Expo (React Native + Expo Router) — mobile UI, same API
 packages/
-  db/       Prisma schema (SQLite for dev; swap to Postgres for prod) + seed
+  db/       Prisma schema (Postgres) + seed script
   shared/   Degree-of-separation graph + matching/scoring engine, with tests
 ```
 
@@ -88,9 +88,11 @@ friends into a chat and hoping they sort out who's looking for what, you send
 each of them your link and the app builds the graph (and shows them each
 other, and anyone else in your network) automatically.
 
-SQLite has no native enum support, so status/type fields (`urgency`,
-`roomType`, connection `status`, etc.) are plain strings validated at the
-application layer — see the comments above each model in
+Status/type fields (`urgency`, `roomType`, connection `status`, etc.) are
+plain strings validated at the application layer rather than native Postgres
+enums — that's a holdover from when this ran on SQLite (no enum support
+there) and there was no reason to churn working model code just because the
+datasource moved. See the comments above each model in
 `packages/db/prisma/schema.prisma` for the allowed values.
 
 ## Trust & safety, and the rest of a real app
@@ -111,11 +113,10 @@ needs before real strangers-of-friends use it:
   (symmetric — you disappear from each other's matches, messaging, and
   profile pages, and any existing connection is severed).
 - **Password reset and email verification.** Token-based, single-use,
-  expiring. There's no real email provider wired up — `apps/web/lib/mailer.ts`
-  just logs the link server-side — swap that one function for
-  Resend/SES/Postmark/etc before real users need it. Email verification is a
-  non-blocking nudge (a dismissible banner + resend button), not a signup
-  gate.
+  expiring. Delivery goes through Resend when `RESEND_API_KEY` is set;
+  without it, `apps/web/lib/mailer.ts` just logs the link server-side, which
+  is all local dev needs. Email verification is a non-blocking nudge (a
+  dismissible banner + resend button), not a signup gate.
 - **Account deletion.** `/account` — requires re-entering your password,
   cascades through your need/offer/lifestyle/connections/messages/vouches
   via the `onDelete: Cascade` rules in `schema.prisma`. Deleting an inviter
@@ -146,10 +147,11 @@ functionality.
 ## Running it locally
 
 ```bash
-npm install
+# local Postgres in Docker (nearby/nearby, matches the .env.example below)
+docker compose up -d
 
-# set up the database (SQLite file, seeded with a demo network)
-npm run db:generate
+npm install   # postinstall runs `prisma generate` automatically
+
 npm run db:push
 npm run db:seed
 
@@ -162,13 +164,16 @@ npm run dev:mobile
 
 First copy `apps/web/.env.example` to `apps/web/.env.local` (and
 `packages/db/.env.example` to `packages/db/.env`) — neither is committed since
-`.env*` files are gitignored. `apps/web/.env.example` also has `APP_URL`
-(used to build the links in password-reset/verification emails) and
-`ADMIN_EMAIL` (whoever's email matches this sees the "Admin" nav link and
-`/admin/reports`). Copy `apps/mobile/.env.example` to `apps/mobile/.env` too
-if you need to point the mobile app at a non-default API URL (e.g.
-`http://10.0.2.2:3000` for the Android emulator, or your machine's LAN IP for
-a physical device).
+`.env*` files are gitignored. Both default `DATABASE_URL` to the
+`docker-compose.yml` Postgres instance above; point it at a real database
+(Neon, Supabase, Railway, RDS, etc.) instead if you'd rather not run Postgres
+locally. `apps/web/.env.example` also has `APP_URL` (used to build the links
+in password-reset/verification emails), `ADMIN_EMAIL` (whoever's email
+matches this sees the "Admin" nav link and `/admin/reports`), and optionally
+`RESEND_API_KEY`/`EMAIL_FROM` for real email delivery. Copy
+`apps/mobile/.env.example` to `apps/mobile/.env` too if you need to point the
+mobile app at a non-default API URL (e.g. `http://10.0.2.2:3000` for the
+Android emulator, or your machine's LAN IP for a physical device).
 
 ### Try the demo network
 
@@ -200,6 +205,46 @@ have made that obvious.
 Run `npm test` to run the matching engine's unit tests directly (no server
 needed).
 
+## Deploying to production
+
+The web app (`apps/web`) is a standard Next.js app, so any Next-friendly host
+works; these steps assume **Vercel** since it needs zero config for this
+repo's monorepo layout.
+
+1. **Database.** Create a free Postgres instance on
+   [Neon](https://neon.tech) or [Supabase](https://supabase.com) — either
+   works fine with Prisma. Grab the **pooled** connection string (Neon calls
+   it "pooled connection"; Supabase's "Transaction" mode pooler) — serverless
+   functions open many short-lived connections, and an unpooled string will
+   exhaust Postgres's connection limit under real traffic.
+2. **Push the schema.** From your machine, with that connection string as
+   `DATABASE_URL` in `packages/db/.env`: `npm run db:push` (and `npm run
+   db:seed` only if you want the demo network in production — you probably
+   don't).
+3. **Email.** Create a [Resend](https://resend.com) account and API key. For
+   more than a handful of test emails, verify a domain there and set
+   `EMAIL_FROM` to an address on it — their default sandbox sender
+   (`onboarding@resend.dev`) is rate-limited and meant for testing.
+4. **Deploy on Vercel.** Import the GitHub repo, set the project's **Root
+   Directory** to `apps/web` (Vercel still runs `npm install` from the repo
+   root first, so the npm workspaces resolve correctly). Set these
+   environment variables in the Vercel project settings:
+   - `DATABASE_URL` — the pooled connection string from step 1
+   - `JWT_SECRET` — a long random string (`openssl rand -hex 32`); the app
+     refuses to boot in production without this
+   - `APP_URL` — your Vercel deployment's URL (used in emailed links)
+   - `ADMIN_EMAIL` — your own account's email, to unlock `/admin/reports`
+   - `RESEND_API_KEY` and `EMAIL_FROM` — from step 3
+   Deploy. `prisma generate` runs automatically via the root `postinstall`
+   script, so no extra build configuration is needed.
+5. **Mobile.** Set `EXPO_PUBLIC_API_URL` (`apps/mobile/.env`) to your
+   deployed web app's URL, then run `npx expo start` and share the QR code —
+   Expo Go (free, on the App Store/Play Store) opens it directly on a phone
+   with no app-store submission needed. That's the fastest way to actually
+   hand this to people in your network; a real App Store/Play Store release
+   is a separate, later step (`eas build`) once you want it installable
+   without Expo Go.
+
 ## What's deliberately out of scope for this MVP
 
 - **Real social-graph import.** Connections are added by email today (like a
@@ -208,8 +253,5 @@ needed).
   step, and is where "friend of a friend" scale actually comes from.
 - **Push notifications** for new matches, messages, incoming connection
   requests, etc. — right now you only find out by opening the app.
-- **A real email provider and multi-admin moderation tooling.** The mailer
-  and admin gate here are both intentionally minimal stand-ins (see above),
-  not things to launch on as-is.
-- **Postgres in production.** The Prisma schema is written to swap the
-  `datasource` provider with no model changes needed.
+- **Multi-admin moderation tooling.** `/admin/reports` is gated by a single
+  `ADMIN_EMAIL`, not a real roles/permissions system.

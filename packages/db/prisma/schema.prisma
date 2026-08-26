@@ -3,10 +3,15 @@ generator client {
 }
 
 datasource db {
-  // SQLite for local/dev simplicity. Swap to "postgresql" + DATABASE_URL for production.
-  // SQLite has no native enum support, so status/type fields below are plain
-  // strings validated at the application layer (see packages/shared types).
-  provider = "sqlite"
+  // Postgres, for real hosting (Vercel/serverless has no persistent disk, so
+  // SQLite's local file doesn't work there). Run one locally via
+  // `docker compose up -d` (see docker-compose.yml) for local dev.
+  // Status/type fields below (urgency, roomType, etc.) stay plain strings
+  // rather than native Postgres enums — they were originally written for
+  // SQLite (no enum support there) and there's no reason to churn working
+  // model code just because the datasource moved; validation already lives
+  // at the application layer (see packages/shared types).
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

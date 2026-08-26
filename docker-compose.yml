@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nearby
+      POSTGRES_PASSWORD: nearby
+      POSTGRES_DB: nearby
+    ports:
+      - "5432:5432"
+    volumes:
+      - nearby-db-data:/var/lib/postgresql/data
+
+volumes:
+  nearby-db-data:
