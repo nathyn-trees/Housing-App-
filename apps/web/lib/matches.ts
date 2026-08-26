@@ -1,6 +1,7 @@
 import { prisma } from "@housing-app/db";
 import { generateMatches, type CandidateInput, type NeedLike, type LifestyleLike, type MatchBreakdown } from "@housing-app/shared";
 import type { Edge } from "@housing-app/shared";
+import { getBlockedUserIdSet } from "@/lib/blocks";
 
 export interface EnrichedMatch {
   userId: string;
@@ -15,6 +16,7 @@ export interface EnrichedMatch {
   action: "INTERESTED" | "PASSED" | null;
   need: NeedLike & { notes?: string | null; description?: string | null; rentAmount?: number };
   lifestyle: LifestyleLike | null;
+  canMessage: boolean;
 }
 
 function offerToNeedLike(offer: {
@@ -63,10 +65,17 @@ async function getAcceptedEdges(): Promise<Edge[]> {
  * hops) and ranked by practical fit + lifestyle compatibility + connection
  * strength.
  */
-export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed: NeedLike | null; matches: EnrichedMatch[] }> {
+export async function getMatchesForUser(viewerId: string): Promise<{
+  viewerNeed: NeedLike | null;
+  needStatus: "MISSING" | "ACTIVE" | "PAUSED" | "FOUND";
+  matches: EnrichedMatch[];
+}> {
   const viewerNeedRow = await prisma.housingNeed.findUnique({ where: { userId: viewerId } });
-  if (!viewerNeedRow || viewerNeedRow.status !== "ACTIVE") {
-    return { viewerNeed: null, matches: [] };
+  if (!viewerNeedRow) {
+    return { viewerNeed: null, needStatus: "MISSING", matches: [] };
+  }
+  if (viewerNeedRow.status !== "ACTIVE") {
+    return { viewerNeed: null, needStatus: viewerNeedRow.status as "PAUSED" | "FOUND", matches: [] };
   }
 
   const viewerNeed: NeedLike = {
@@ -81,14 +90,31 @@ export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed:
     visibility: viewerNeedRow.visibility,
   };
 
-  const [edges, otherNeeds, otherOffers, vouchCounts, passedActions, viewerLifestyleRow] = await Promise.all([
-    getAcceptedEdges(),
-    prisma.housingNeed.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
-    prisma.housingOffer.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
-    prisma.vouch.groupBy({ by: ["targetId"], _count: { targetId: true } }),
-    prisma.matchAction.findMany({ where: { actorId: viewerId } }),
-    prisma.lifestyleProfile.findUnique({ where: { userId: viewerId } }),
-  ]);
+  const [edges, otherNeedsRaw, otherOffersRaw, vouchCounts, passedActions, viewerLifestyleRow, blockedUserIds, interestActions] =
+    await Promise.all([
+      getAcceptedEdges(),
+      prisma.housingNeed.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
+      prisma.housingOffer.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
+      prisma.vouch.groupBy({ by: ["targetId"], _count: { targetId: true } }),
+      prisma.matchAction.findMany({ where: { actorId: viewerId } }),
+      prisma.lifestyleProfile.findUnique({ where: { userId: viewerId } }),
+      getBlockedUserIdSet(viewerId),
+      prisma.matchAction.findMany({ where: { OR: [{ userAId: viewerId }, { userBId: viewerId }], action: "INTERESTED" } }),
+    ]);
+
+  // Mutual interest ("it's a match"): both people independently marked each other interested.
+  const interestActorsByOther = new Map<string, Set<string>>();
+  for (const a of interestActions) {
+    const otherId = a.userAId === viewerId ? a.userBId : a.userAId;
+    if (!interestActorsByOther.has(otherId)) interestActorsByOther.set(otherId, new Set());
+    interestActorsByOther.get(otherId)!.add(a.actorId);
+  }
+  const mutualInterestUserIds = new Set(
+    [...interestActorsByOther.entries()].filter(([otherId, actors]) => actors.has(viewerId) && actors.has(otherId)).map(([otherId]) => otherId),
+  );
+
+  const otherNeeds = otherNeedsRaw.filter((n) => !blockedUserIds.has(n.userId));
+  const otherOffers = otherOffersRaw.filter((o) => !blockedUserIds.has(o.userId));
 
   const candidateUserIds = [...otherNeeds.map((n) => n.userId), ...otherOffers.map((o) => o.userId)];
   const lifestyleRows = await prisma.lifestyleProfile.findMany({ where: { userId: { in: candidateUserIds } } });
@@ -168,8 +194,9 @@ export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed:
       action: (actionByUser.get(m.userId) as "INTERESTED" | "PASSED" | undefined) ?? null,
       need: { ...rawByUser.get(m.userId)!, notes: needRow?.notes, description: offerRow?.description, rentAmount: offerRow?.rentAmount },
       lifestyle: lifestyleByUser.get(m.userId) ?? null,
+      canMessage: m.degree === 1 || mutualInterestUserIds.has(m.userId),
     };
   });
 
-  return { viewerNeed, matches };
+  return { viewerNeed, needStatus: "ACTIVE", matches };
 }

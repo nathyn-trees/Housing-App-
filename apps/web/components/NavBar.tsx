@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import LogoutButton from "@/components/LogoutButton";
 
 export default async function NavBar() {
   const user = await getCurrentUser();
+  const admin = isAdmin(user);
 
   return (
     <header className="border-b border-neutral-200 bg-white">
@@ -17,6 +19,9 @@ export default async function NavBar() {
               <Link href="/matches" className="text-neutral-700 hover:text-brand-600">
                 Matches
               </Link>
+              <Link href="/messages" className="text-neutral-700 hover:text-brand-600">
+                Messages
+              </Link>
               <Link href="/connections" className="text-neutral-700 hover:text-brand-600">
                 Connections
               </Link>
@@ -26,7 +31,14 @@ export default async function NavBar() {
               <Link href="/lifestyle" className="text-neutral-700 hover:text-brand-600">
                 Lifestyle
               </Link>
-              <span className="text-neutral-400">{user.name}</span>
+              {admin && (
+                <Link href="/admin/reports" className="text-neutral-700 hover:text-brand-600">
+                  Admin
+                </Link>
+              )}
+              <Link href="/account" className="text-neutral-400 hover:text-brand-600">
+                {user.name}
+              </Link>
               <LogoutButton />
             </>
           ) : (

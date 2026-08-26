@@ -16,6 +16,7 @@ export async function GET() {
     bio: user.bio,
     city: user.city,
     inviteCode: user.inviteCode,
+    emailVerified: !!user.emailVerifiedAt,
     hasNeed: !!need,
     hasOffer: !!offer,
   });

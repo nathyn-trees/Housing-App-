@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, ActivityIndicator } from "react-native";
 import { router } from "expo-router";
 import { api, ApiError } from "@/lib/api";
@@ -6,6 +6,11 @@ import { useAuth } from "@/lib/auth-context";
 
 const URGENCIES = ["FLEXIBLE", "SOON", "URGENT"] as const;
 const ROOM_TYPES = ["ANY", "PRIVATE_ROOM", "SHARED_ROOM", "ENTIRE_PLACE"] as const;
+const STATUSES = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "PAUSED", label: "Paused" },
+  { value: "FOUND", label: "Found a place" },
+] as const;
 
 function ChoiceRow<T extends string>({ options, value, onChange }: { options: readonly T[]; value: T; onChange: (v: T) => void }) {
   return (
@@ -33,8 +38,26 @@ export default function NeedScreen() {
   const [urgency, setUrgency] = useState<(typeof URGENCIES)[number]>("FLEXIBLE");
   const [roomType, setRoomType] = useState<(typeof ROOM_TYPES)[number]>("ANY");
   const [notes, setNotes] = useState("");
+  const [status, setStatus] = useState<(typeof STATUSES)[number]["value"] | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api<{ status: string } | null>("/api/needs")
+      .then((need) => setStatus((need?.status as (typeof STATUSES)[number]["value"]) ?? null))
+      .catch(() => setStatus(null));
+  }, []);
+
+  async function changeStatus(next: (typeof STATUSES)[number]["value"]) {
+    setStatusBusy(true);
+    try {
+      await api("/api/needs/status", { method: "PATCH", body: JSON.stringify({ status: next }) });
+      setStatus(next);
+    } finally {
+      setStatusBusy(false);
+    }
+  }
 
   async function handleSave() {
     setError(null);
@@ -55,6 +78,13 @@ export default function NeedScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {status && (
+        <View>
+          <Text style={styles.label}>Status</Text>
+          <ChoiceRow options={STATUSES.map((s) => s.value)} value={status} onChange={(v) => !statusBusy && changeStatus(v)} />
+        </View>
+      )}
+
       <Text style={styles.label}>City</Text>
       <TextInput style={styles.input} placeholder="New York, NY" value={city} onChangeText={setCity} />
 

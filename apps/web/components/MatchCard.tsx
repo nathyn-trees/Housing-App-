@@ -130,6 +130,11 @@ export default function MatchCard({ match }: { match: EnrichedMatch }) {
         <button disabled={busy} onClick={() => sendAction("PASSED")} className="rounded px-3 py-1.5 text-sm text-neutral-500 hover:text-red-600">
           Pass
         </button>
+        {match.canMessage && (
+          <Link href={`/messages/${match.userId}`} className="rounded px-3 py-1.5 text-sm text-brand-700 underline">
+            Message
+          </Link>
+        )}
       </div>
     </div>
   );

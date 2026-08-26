@@ -36,6 +36,7 @@ interface Match {
   action: "INTERESTED" | "PASSED" | null;
   need: MatchNeed;
   lifestyle: unknown | null;
+  canMessage: boolean;
 }
 
 const BARS: { key: keyof MatchBreakdown; label: string }[] = [
@@ -106,7 +107,9 @@ export default function MatchesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: "#fafaf9" }}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Hi {user?.name}</Text>
+        <Pressable onPress={() => router.push("/account")}>
+          <Text style={styles.headerText}>Hi {user?.name}</Text>
+        </Pressable>
         <Pressable onPress={handleLogout}>
           <Text style={styles.logout}>Log out</Text>
         </Pressable>
@@ -134,9 +137,11 @@ export default function MatchesScreen() {
               </View>
               <Text style={styles.score}>{item.score}%</Text>
             </View>
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name}
-            </Text>
+            <Pressable onPress={() => router.push(`/profile/${item.userId}`)}>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.name}
+              </Text>
+            </Pressable>
             <Text style={styles.meta} numberOfLines={1}>
               {item.degree === 1 ? "Direct" : item.via ? `Via ${item.via.name}` : `${item.degree}° away`}
               {item.vouchCount > 0 ? ` · ${item.vouchCount}v` : ""}
@@ -178,6 +183,11 @@ export default function MatchesScreen() {
                 <Text style={styles.passText}>Pass</Text>
               </Pressable>
             </View>
+            {item.canMessage && (
+              <Pressable onPress={() => router.push(`/messages/${item.userId}`)}>
+                <Text style={styles.messageLink}>Message</Text>
+              </Pressable>
+            )}
           </View>
         )}
       />
@@ -213,4 +223,5 @@ const styles = StyleSheet.create({
   interestedButton: { flex: 1, borderWidth: 1, borderColor: "#2f6f52", borderRadius: 8, paddingVertical: 6, alignItems: "center", marginRight: 8 },
   interestedText: { color: "#2f6f52", fontWeight: "600", fontSize: 11 },
   passText: { color: "#737373", fontSize: 11 },
+  messageLink: { color: "#255a42", fontSize: 11, textDecorationLine: "underline", marginTop: 8, textAlign: "center" },
 });

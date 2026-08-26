@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Linking } from "react-native";
 import { Link, router } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/api";
+import { ApiError, API_URL } from "@/lib/api";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -42,6 +42,9 @@ export default function LoginScreen() {
       {error && <Text style={styles.error}>{error}</Text>}
       <Pressable style={styles.button} onPress={handleLogin} disabled={loading}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Log in</Text>}
+      </Pressable>
+      <Pressable onPress={() => Linking.openURL(`${API_URL}/forgot-password`)}>
+        <Text style={styles.link}>Forgot password?</Text>
       </Pressable>
       <Link href="/signup" style={styles.link}>
         Need an account? Sign up

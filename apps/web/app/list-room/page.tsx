@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@housing-app/db";
 import OfferForm from "@/components/OfferForm";
+import StatusControl from "@/components/StatusControl";
 
 export default async function ListRoomPage() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export default async function ListRoomPage() {
           This is shown the same way as a housing need — private, and only surfaced to people in your network.
         </p>
       </div>
+      {existingOffer && <StatusControl endpoint="/api/offers/status" status={existingOffer.status} />}
       <OfferForm
         defaultCity={existingOffer?.city ?? user.city ?? ""}
         existingOffer={

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator, Linking } from "react-native";
 import { Link, router, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
-import { ApiError } from "@/lib/api";
+import { ApiError, API_URL } from "@/lib/api";
 
 export default function SignupScreen() {
   const { signup } = useAuth();
@@ -12,6 +12,7 @@ export default function SignupScreen() {
   const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState(invite ?? "");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,7 @@ export default function SignupScreen() {
     setError(null);
     setLoading(true);
     try {
-      await signup(name, email, password, city, inviteCode || undefined);
+      await signup(name, email, password, city, inviteCode || undefined, agreed);
       router.replace("/need");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something went wrong.");
@@ -49,8 +50,21 @@ export default function SignupScreen() {
         value={inviteCode}
         onChangeText={setInviteCode}
       />
+      <Pressable style={styles.agreeRow} onPress={() => setAgreed(!agreed)}>
+        <View style={[styles.checkbox, agreed && styles.checkboxChecked]} />
+        <Text style={styles.agreeText}>
+          I agree to the{" "}
+          <Text style={styles.link} onPress={() => Linking.openURL(`${API_URL}/terms`)}>
+            Terms
+          </Text>{" "}
+          and{" "}
+          <Text style={styles.link} onPress={() => Linking.openURL(`${API_URL}/privacy`)}>
+            Privacy Policy
+          </Text>
+        </Text>
+      </Pressable>
       {error && <Text style={styles.error}>{error}</Text>}
-      <Pressable style={styles.button} onPress={handleSignup} disabled={loading}>
+      <Pressable style={styles.button} onPress={handleSignup} disabled={loading || !agreed}>
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign up</Text>}
       </Pressable>
       <Link href="/login" style={styles.link}>
@@ -68,4 +82,8 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
   error: { color: "#dc2626" },
   link: { color: "#255a42", textAlign: "center", marginTop: 12, textDecorationLine: "underline" },
+  agreeRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 4 },
+  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: "#d4d4d4", marginTop: 2 },
+  checkboxChecked: { backgroundColor: "#2f6f52", borderColor: "#2f6f52" },
+  agreeText: { flex: 1, fontSize: 13, color: "#404040" },
 });

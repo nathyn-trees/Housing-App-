@@ -42,7 +42,12 @@ export default function LoginPage() {
           <input name="email" type="email" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </div>
         <div>
-          <label className="block text-sm font-medium">Password</label>
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium">Password</label>
+            <Link href="/forgot-password" className="text-xs text-brand-700 underline">
+              Forgot password?
+            </Link>
+          </div>
           <input name="password" type="password" required className="mt-1 w-full rounded border border-neutral-300 px-3 py-2" />
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}

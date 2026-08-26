@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@housing-app/db";
 import NeedForm from "@/components/NeedForm";
+import StatusControl from "@/components/StatusControl";
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
@@ -17,6 +18,7 @@ export default async function OnboardingPage() {
           This stays private — only people within your network (a friend, or a friend of a friend) will ever see it.
         </p>
       </div>
+      {existingNeed && <StatusControl endpoint="/api/needs/status" status={existingNeed.status} />}
       <NeedForm
         defaultCity={existingNeed?.city ?? user.city ?? ""}
         existingNeed={

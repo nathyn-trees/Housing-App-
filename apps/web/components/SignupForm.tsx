@@ -8,6 +8,7 @@ export default function SignupForm({ inviteCode, inviterName }: { inviteCode?: s
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -23,6 +24,7 @@ export default function SignupForm({ inviteCode, inviterName }: { inviteCode?: s
         password: form.get("password"),
         city: form.get("city"),
         inviteCode,
+        agreedToTerms: agreed,
       }),
     });
     setLoading(false);
@@ -66,10 +68,24 @@ export default function SignupForm({ inviteCode, inviterName }: { inviteCode?: s
             className="mt-1 w-full rounded border border-neutral-300 px-3 py-2"
           />
         </div>
+        <label className="flex items-start gap-2 text-sm text-neutral-600">
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5" />
+          <span>
+            I agree to the{" "}
+            <Link href="/terms" target="_blank" className="text-brand-700 underline">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" target="_blank" className="text-brand-700 underline">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !agreed}
           className="w-full rounded bg-brand-600 px-4 py-2 text-white hover:bg-brand-700 disabled:opacity-50"
         >
           {loading ? "Creating account..." : "Sign up"}

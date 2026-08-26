@@ -3,6 +3,12 @@ import { cookies, headers } from "next/headers";
 import { prisma } from "@housing-app/db";
 
 const SESSION_COOKIE = "session";
+
+// A hardcoded fallback secret is fine for local dev but would let anyone forge
+// a session cookie against a real deployment, so production must set its own.
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET must be set in production — refusing to start with a default/guessable secret.");
+}
 const JWT_SECRET = process.env.JWT_SECRET ?? "local-dev-secret-do-not-use-in-production-31f9a7";
 
 export function signSession(userId: string): string {

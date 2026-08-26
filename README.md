@@ -93,6 +93,56 @@ SQLite has no native enum support, so status/type fields (`urgency`,
 application layer — see the comments above each model in
 `packages/db/prisma/schema.prisma` for the allowed values.
 
+## Trust & safety, and the rest of a real app
+
+Beyond the core matching mechanic, this covers the baseline a housing app
+needs before real strangers-of-friends use it:
+
+- **Messaging.** Unlocked once two people are either an accepted connection
+  or have *mutually* marked each other "interested" on the match feed — see
+  `canMessage` in `apps/web/lib/messages.ts`. One-sided interest doesn't
+  unlock it. Polling-based (no websockets), at `/messages`.
+- **Mark as found/paused.** A need or offer can be set to `PAUSED` or `FOUND`
+  (Onboarding / List a room pages), which immediately removes it from
+  everyone's match feed — the schema always had this status field, but
+  nothing let you change it until now.
+- **Report and block.** Any profile has Report (goes to a minimal admin
+  queue at `/admin/reports`, gated by the `ADMIN_EMAIL` env var) and Block
+  (symmetric — you disappear from each other's matches, messaging, and
+  profile pages, and any existing connection is severed).
+- **Password reset and email verification.** Token-based, single-use,
+  expiring. There's no real email provider wired up — `apps/web/lib/mailer.ts`
+  just logs the link server-side — swap that one function for
+  Resend/SES/Postmark/etc before real users need it. Email verification is a
+  non-blocking nudge (a dismissible banner + resend button), not a signup
+  gate.
+- **Account deletion.** `/account` — requires re-entering your password,
+  cascades through your need/offer/lifestyle/connections/messages/vouches
+  via the `onDelete: Cascade` rules in `schema.prisma`. Deleting an inviter
+  sets their invitees' `invitedById` to null instead of cascading (so
+  deleting one account doesn't wipe out everyone they invited).
+- **Terms of Service / Privacy Policy.** `/terms` and `/privacy` are
+  explicitly labeled placeholders — standard MVP boilerplate, not reviewed by
+  a lawyer. Signup requires checking a box agreeing to them, and records
+  `termsAcceptedAt`, but the content itself needs real legal review before
+  onboarding anyone who isn't testing the product for you. Also worth
+  knowing: roommate-matching has a narrower Fair Housing carve-out than
+  landlord listings in the U.S. — that carve-out disappears if this ever
+  grows into people posting actual landlord units.
+- **Rate limiting.** A minimal in-memory limiter (`apps/web/lib/rateLimit.ts`)
+  on login, signup, password reset, and reporting. Good enough for a
+  single-process deployment; a real multi-instance deployment needs a shared
+  store (Redis) instead.
+- **JWT secret.** `apps/web/lib/auth.ts` refuses to start in production
+  without an explicit `JWT_SECRET` — no more falling back to the checked-in
+  dev default.
+
+Mobile gets full parity on messaging and a profile screen (with vouch/
+report/block), since those are safety-relevant. Password reset and email
+verification open the web pages in the device browser instead of
+duplicating native screens — a normal pattern, not a shortcut that drops
+functionality.
+
 ## Running it locally
 
 ```bash
@@ -112,10 +162,13 @@ npm run dev:mobile
 
 First copy `apps/web/.env.example` to `apps/web/.env.local` (and
 `packages/db/.env.example` to `packages/db/.env`) — neither is committed since
-`.env*` files are gitignored. Copy `apps/mobile/.env.example` to
-`apps/mobile/.env` too if you need to point the mobile app at a non-default
-API URL (e.g. `http://10.0.2.2:3000` for the Android emulator, or your
-machine's LAN IP for a physical device).
+`.env*` files are gitignored. `apps/web/.env.example` also has `APP_URL`
+(used to build the links in password-reset/verification emails) and
+`ADMIN_EMAIL` (whoever's email matches this sees the "Admin" nav link and
+`/admin/reports`). Copy `apps/mobile/.env.example` to `apps/mobile/.env` too
+if you need to point the mobile app at a non-default API URL (e.g.
+`http://10.0.2.2:3000` for the Android emulator, or your machine's LAN IP for
+a physical device).
 
 ### Try the demo network
 
@@ -153,8 +206,10 @@ needed).
   friend request). Real contact-list / social-account linking (so the graph
   seeds itself instead of everyone re-adding each other) is the natural next
   step, and is where "friend of a friend" scale actually comes from.
-- **Messaging.** Once two people mark mutual interest, there's no in-app chat
-  yet — that's the obvious next feature.
-- **Push notifications** for new matches, incoming connection requests, etc.
+- **Push notifications** for new matches, messages, incoming connection
+  requests, etc. — right now you only find out by opening the app.
+- **A real email provider and multi-admin moderation tooling.** The mailer
+  and admin gate here are both intentionally minimal stand-ins (see above),
+  not things to launch on as-is.
 - **Postgres in production.** The Prisma schema is written to swap the
   `datasource` provider with no model changes needed.

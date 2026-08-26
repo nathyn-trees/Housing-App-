@@ -8,15 +8,31 @@ export default async function MatchesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { viewerNeed, matches } = await getMatchesForUser(user.id);
+  const { viewerNeed, needStatus, matches } = await getMatchesForUser(user.id);
 
-  if (!viewerNeed) {
+  if (needStatus === "MISSING") {
     return (
       <div className="mx-auto max-w-xl space-y-4 text-center">
         <h1 className="text-2xl font-bold text-brand-700">Tell us what you&apos;re looking for</h1>
         <p className="text-neutral-600">Add your housing needs to start seeing private matches from your network.</p>
         <Link href="/onboarding" className="inline-block rounded bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">
           Get started
+        </Link>
+      </div>
+    );
+  }
+
+  if (!viewerNeed) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4 text-center">
+        <h1 className="text-2xl font-bold text-brand-700">
+          {needStatus === "FOUND" ? "You've marked your search as done" : "Your search is paused"}
+        </h1>
+        <p className="text-neutral-600">
+          You&apos;re hidden from everyone&apos;s matches right now. Reactivate whenever you want to be found again.
+        </p>
+        <Link href="/onboarding" className="inline-block rounded bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">
+          Manage your search
         </Link>
       </div>
     );

@@ -1,8 +1,12 @@
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@housing-app/db";
 import { computeDegrees, type Edge } from "@housing-app/shared";
+import { canMessage } from "@/lib/messages";
+import { isBlocked } from "@/lib/blocks";
 import VouchForm from "@/components/VouchForm";
+import ReportBlockControls from "@/components/ReportBlockControls";
 
 export default async function ProfilePage({ params }: { params: { userId: string } }) {
   const viewer = await getCurrentUser();
@@ -12,6 +16,14 @@ export default async function ProfilePage({ params }: { params: { userId: string
 
   const target = await prisma.user.findUnique({ where: { id: params.userId }, include: { invitedBy: true } });
   if (!target) notFound();
+
+  if (await isBlocked(viewer.id, target.id)) {
+    return (
+      <div className="mx-auto max-w-md text-center text-neutral-600">
+        <p>This profile isn&apos;t available.</p>
+      </div>
+    );
+  }
 
   const connections = await prisma.connectionRequest.findMany({ where: { status: "ACCEPTED" } });
   const edges: Edge[] = connections.map((c) => [c.userAId, c.userBId]);
@@ -29,15 +41,23 @@ export default async function ProfilePage({ params }: { params: { userId: string
   const via = degreeInfo.via ? await prisma.user.findUnique({ where: { id: degreeInfo.via } }) : null;
   const vouches = await prisma.vouch.findMany({ where: { targetId: target.id }, include: { voucher: true } });
   const alreadyVouched = vouches.some((v) => v.voucherId === viewer.id);
+  const messagingAllowed = await canMessage(viewer.id, target.id);
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-brand-700">{target.name}</h1>
-        <p className="text-sm text-neutral-500">
-          {degreeInfo.degree === 1 ? "Direct connection" : `${degreeInfo.degree} degrees away${via ? ` · connected via ${via.name}` : ""}`}
-        </p>
-        {target.invitedBy && <p className="text-sm text-neutral-500">Invited by {target.invitedBy.name}</p>}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-brand-700">{target.name}</h1>
+          <p className="text-sm text-neutral-500">
+            {degreeInfo.degree === 1 ? "Direct connection" : `${degreeInfo.degree} degrees away${via ? ` · connected via ${via.name}` : ""}`}
+          </p>
+          {target.invitedBy && <p className="text-sm text-neutral-500">Invited by {target.invitedBy.name}</p>}
+        </div>
+        {messagingAllowed && (
+          <Link href={`/messages/${target.id}`} className="shrink-0 rounded bg-brand-600 px-3 py-1.5 text-sm text-white hover:bg-brand-700">
+            Message
+          </Link>
+        )}
       </div>
 
       {target.bio && <p className="text-neutral-700">{target.bio}</p>}
@@ -58,6 +78,8 @@ export default async function ProfilePage({ params }: { params: { userId: string
       </section>
 
       {degreeInfo.degree === 1 && !alreadyVouched && <VouchForm targetUserId={target.id} targetName={target.name} />}
+
+      <ReportBlockControls targetUserId={target.id} targetName={target.name} />
     </div>
   );
 }
