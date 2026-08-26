@@ -65,6 +65,15 @@ JSON body (`token`) for the mobile app to store in `SecureStore` and send as
 - `MatchAction` — records "interested" / "passed" so the feed doesn't repeat
   itself.
 
+Every `User` also has a unique `inviteCode` (personal link at `/invite/{code}`)
+and an optional `invitedById`. Signing up through someone's link auto-creates
+an **ACCEPTED** `ConnectionRequest` between them — no request/accept step —
+because handing someone your link is you vouching for them into the graph
+directly. This is the intended growth loop: instead of dropping a group of
+friends into a chat and hoping they sort out who's looking for what, you send
+each of them your link and the app builds the graph (and shows them each
+other, and anyone else in your network) automatically.
+
 SQLite has no native enum support, so status/type fields (`urgency`,
 `roomType`, connection `status`, etc.) are plain strings validated at the
 application layer — see the comments above each model in
@@ -105,6 +114,14 @@ All demo accounts use password `password123`. Log in as `alice@example.com`
 and her match feed shows Bob, Cara, and Dana's room — each one "connected via
 Nathyn" — while Erin and Frank, despite fitting her budget just as well, never
 appear.
+
+Alice, Bob, Cara, and Dana were all seeded as if they'd signed up through
+Nathyn's invite link — check the seed script's console output for that link,
+visit it, and sign up as a new person to see the same thing happen live: an
+instant connection to Nathyn and immediate visibility into everyone else in
+his network, no manual "add connection" step required. On the running app,
+any logged-in user's own link is on the Connections page ("Invite someone
+directly").
 
 Run `npm test` to run the matching engine's unit tests directly (no server
 needed).

@@ -10,6 +10,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@housing-app/shared": "*",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3"
   },

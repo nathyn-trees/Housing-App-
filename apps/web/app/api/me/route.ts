@@ -15,6 +15,7 @@ export async function GET() {
     email: user.email,
     bio: user.bio,
     city: user.city,
+    inviteCode: user.inviteCode,
     hasNeed: !!need,
     hasOffer: !!offer,
   });

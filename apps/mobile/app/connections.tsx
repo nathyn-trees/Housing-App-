@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
-import { View, Text, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Pressable, FlatList, StyleSheet, ActivityIndicator, Share } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, API_URL } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 interface Connection {
   id: string;
@@ -11,6 +12,7 @@ interface Connection {
 }
 
 export default function ConnectionsScreen() {
+  const { user } = useAuth();
   const [connections, setConnections] = useState<Connection[] | null>(null);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +48,15 @@ export default function ConnectionsScreen() {
     await load();
   }
 
+  async function handleShareInvite() {
+    if (!user) return;
+    const link = `${API_URL}/invite/${user.inviteCode}`;
+    await Share.share({
+      message: `Join me on Nearby to find a room or roommate — we'll be connected right away: ${link}`,
+      url: link,
+    });
+  }
+
   if (connections === null) {
     return (
       <View style={styles.center}>
@@ -65,6 +76,17 @@ export default function ConnectionsScreen() {
       renderItem={null}
       ListHeaderComponent={
         <View style={{ gap: 16 }}>
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>Invite someone directly</Text>
+            <Text style={styles.inviteBody}>
+              Skip the group chat — share your link with a friend looking for a place. They&apos;ll be connected to
+              you the moment they sign up.
+            </Text>
+            <Pressable style={styles.inviteButton} onPress={handleShareInvite}>
+              <Text style={styles.inviteButtonText}>Share invite link</Text>
+            </Pressable>
+          </View>
+
           <View style={styles.addRow}>
             <TextInput
               style={styles.input}
@@ -131,6 +153,11 @@ export default function ConnectionsScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  inviteCard: { backgroundColor: "#dcece4", borderRadius: 12, padding: 14, gap: 8 },
+  inviteTitle: { fontWeight: "700", color: "#255a42" },
+  inviteBody: { fontSize: 13, color: "#255a42" },
+  inviteButton: { backgroundColor: "#2f6f52", borderRadius: 8, paddingVertical: 10, alignItems: "center" },
+  inviteButtonText: { color: "#fff", fontWeight: "600", fontSize: 13 },
   addRow: { flexDirection: "row", gap: 8 },
   input: { flex: 1, borderWidth: 1, borderColor: "#d4d4d4", borderRadius: 8, padding: 12, backgroundColor: "#fff" },
   addButton: { backgroundColor: "#2f6f52", borderRadius: 8, paddingHorizontal: 16, justifyContent: "center" },

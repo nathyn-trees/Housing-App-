@@ -19,6 +19,16 @@ model User {
   city         String?
   createdAt    DateTime @default(now())
 
+  // Every user gets a personal shareable link (/invite/{inviteCode}).
+  // Signing up through it auto-creates an ACCEPTED connection to the inviter
+  // instead of the normal request/accept flow — the whole point of handing
+  // someone a link instead of adding them to a group chat is that you're
+  // vouching for them into the graph directly.
+  inviteCode   String  @unique
+  invitedById  String?
+  invitedBy    User?   @relation("Invites", fields: [invitedById], references: [id])
+  invitedUsers User[]  @relation("Invites")
+
   need   HousingNeed?
   offer  HousingOffer?
 

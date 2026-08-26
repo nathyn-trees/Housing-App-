@@ -10,7 +10,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
 
   if (params.userId === viewer.id) redirect("/matches");
 
-  const target = await prisma.user.findUnique({ where: { id: params.userId } });
+  const target = await prisma.user.findUnique({ where: { id: params.userId }, include: { invitedBy: true } });
   if (!target) notFound();
 
   const connections = await prisma.connectionRequest.findMany({ where: { status: "ACCEPTED" } });
@@ -37,6 +37,7 @@ export default async function ProfilePage({ params }: { params: { userId: string
         <p className="text-sm text-neutral-500">
           {degreeInfo.degree === 1 ? "Direct connection" : `${degreeInfo.degree} degrees away${via ? ` · connected via ${via.name}` : ""}`}
         </p>
+        {target.invitedBy && <p className="text-sm text-neutral-500">Invited by {target.invitedBy.name}</p>}
       </div>
 
       {target.bio && <p className="text-neutral-700">{target.bio}</p>}

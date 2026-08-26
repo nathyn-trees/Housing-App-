@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@housing-app/db";
 import ConnectionsClient from "@/components/ConnectionsClient";
+import InviteLinkCard from "@/components/InviteLinkCard";
 
 export default async function ConnectionsPage() {
   const user = await getCurrentUser();
@@ -33,6 +34,7 @@ export default async function ConnectionsPage() {
           friends of friends.
         </p>
       </div>
+      <InviteLinkCard inviteCode={user.inviteCode} />
       <ConnectionsClient initialConnections={shaped} />
     </div>
   );

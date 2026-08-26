@@ -7,6 +7,7 @@ export interface CurrentUser {
   email: string;
   bio: string | null;
   city: string | null;
+  inviteCode: string;
   hasNeed: boolean;
   hasOffer: boolean;
 }
@@ -15,7 +16,7 @@ interface AuthContextValue {
   user: CurrentUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, city: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, city: string, inviteCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -48,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await refresh();
   }
 
-  async function signup(name: string, email: string, password: string, city: string) {
+  async function signup(name: string, email: string, password: string, city: string, inviteCode?: string) {
     const result = await api<{ token: string }>("/api/auth/signup", {
       method: "POST",
-      body: JSON.stringify({ name, email, password, city }),
+      body: JSON.stringify({ name, email, password, city, inviteCode }),
     });
     await setToken(result.token);
     await refresh();
