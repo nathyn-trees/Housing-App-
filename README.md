@@ -22,8 +22,9 @@ strangers.
      (each need/offer has a privacy dial: direct connections only / friends
      of friends / up to 3 degrees).
 5. Surfaced candidates are ranked by a blended score: budget overlap,
-   location overlap, move-in timeline proximity, room-type compatibility, and
-   a trust component (closer connections and vouches score higher).
+   location overlap, move-in timeline proximity, room-type compatibility,
+   lifestyle compatibility, and a trust component (closer connections and
+   vouches score higher).
 
 Two people with identical stats are treated completely differently depending
 on whether there's a path between them — a stranger with a perfect budget
@@ -33,6 +34,14 @@ credited to whoever connects you. That's the whole point.
 This logic lives in `packages/shared` (`graph.ts` for the BFS,
 `matching.ts` for scoring) and is covered by unit tests that encode the
 "three friends who don't know each other" scenario directly.
+
+The match feed (`/matches`) is a grid, not a swipe deck. With a pool this
+small — dozens of people within your network, not an endless stream of
+strangers — a swipe interaction encourages passing on a legitimately good,
+vouched-for match on the "maybe the next one's better" instinct. A grid lets
+you compare several at once, including the score breakdown (budget/area/
+timing/lifestyle/trust) as small bars on each card, before acting on any of
+them.
 
 ## Structure
 
@@ -64,6 +73,11 @@ JSON body (`token`) for the mobile app to store in `SecureStore` and send as
 - `Vouch` — a trust signal one direct connection leaves for another.
 - `MatchAction` — records "interested" / "passed" so the feed doesn't repeat
   itself.
+- `LifestyleProfile` — optional personal compatibility traits (cleanliness,
+  how often you're home, how often you host, introvert/extrovert), one per
+  user rather than per listing, since they don't change per search. A missing
+  profile scores as neutral rather than penalizing the match — see
+  `lifestyleScore` in `packages/shared/src/matching.ts`.
 
 Every `User` also has a unique `inviteCode` (personal link at `/invite/{code}`)
 and an optional `invitedById`. Signing up through someone's link auto-creates
@@ -122,6 +136,13 @@ instant connection to Nathyn and immediate visibility into everyone else in
 his network, no manual "add connection" step required. On the running app,
 any logged-in user's own link is on the Connections page ("Invite someone
 directly").
+
+Alice and Cara also have identical seeded lifestyle profiles (tidy, home a
+lot, keep to themselves) while Bob's is the opposite on every axis — despite
+Bob's budget/timing overlapping reasonably with Alice's. Her match grid at
+`/matches` shows this directly: Cara's lifestyle bar is full, Bob's is mostly
+empty, and Cara outranks him even though a budget-only comparison wouldn't
+have made that obvious.
 
 Run `npm test` to run the matching engine's unit tests directly (no server
 needed).

@@ -1,5 +1,5 @@
 import { prisma } from "@housing-app/db";
-import { generateMatches, type CandidateInput, type NeedLike } from "@housing-app/shared";
+import { generateMatches, type CandidateInput, type NeedLike, type LifestyleLike, type MatchBreakdown } from "@housing-app/shared";
 import type { Edge } from "@housing-app/shared";
 
 export interface EnrichedMatch {
@@ -10,9 +10,11 @@ export interface EnrichedMatch {
   degree: number;
   via: { id: string; name: string } | null;
   score: number;
+  breakdown: MatchBreakdown;
   vouchCount: number;
   action: "INTERESTED" | "PASSED" | null;
   need: NeedLike & { notes?: string | null; description?: string | null; rentAmount?: number };
+  lifestyle: LifestyleLike | null;
 }
 
 function offerToNeedLike(offer: {
@@ -37,6 +39,16 @@ function offerToNeedLike(offer: {
   };
 }
 
+function toLifestyleLike(row: { cleanliness: number; timeAtHome: string; hostingGuests: string; socialStyle: string } | null): LifestyleLike | undefined {
+  if (!row) return undefined;
+  return {
+    cleanliness: row.cleanliness,
+    timeAtHome: row.timeAtHome as LifestyleLike["timeAtHome"],
+    hostingGuests: row.hostingGuests as LifestyleLike["hostingGuests"],
+    socialStyle: row.socialStyle as LifestyleLike["socialStyle"],
+  };
+}
+
 async function getAcceptedEdges(): Promise<Edge[]> {
   const connections = await prisma.connectionRequest.findMany({
     where: { status: "ACCEPTED" },
@@ -48,7 +60,8 @@ async function getAcceptedEdges(): Promise<Edge[]> {
 /**
  * Computes this user's private match feed: other people's housing needs and
  * room offers, filtered to the trust graph (only reachable within a few
- * hops) and ranked by practical fit + connection strength.
+ * hops) and ranked by practical fit + lifestyle compatibility + connection
+ * strength.
  */
 export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed: NeedLike | null; matches: EnrichedMatch[] }> {
   const viewerNeedRow = await prisma.housingNeed.findUnique({ where: { userId: viewerId } });
@@ -68,13 +81,19 @@ export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed:
     visibility: viewerNeedRow.visibility,
   };
 
-  const [edges, otherNeeds, otherOffers, vouchCounts, passedActions] = await Promise.all([
+  const [edges, otherNeeds, otherOffers, vouchCounts, passedActions, viewerLifestyleRow] = await Promise.all([
     getAcceptedEdges(),
     prisma.housingNeed.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
     prisma.housingOffer.findMany({ where: { status: "ACTIVE", userId: { not: viewerId }, city: viewerNeed.city } }),
     prisma.vouch.groupBy({ by: ["targetId"], _count: { targetId: true } }),
     prisma.matchAction.findMany({ where: { actorId: viewerId } }),
+    prisma.lifestyleProfile.findUnique({ where: { userId: viewerId } }),
   ]);
+
+  const candidateUserIds = [...otherNeeds.map((n) => n.userId), ...otherOffers.map((o) => o.userId)];
+  const lifestyleRows = await prisma.lifestyleProfile.findMany({ where: { userId: { in: candidateUserIds } } });
+  const lifestyleByUser = new Map(lifestyleRows.map((l) => [l.userId, toLifestyleLike(l)!]));
+  const viewerLifestyle = toLifestyleLike(viewerLifestyleRow);
 
   const vouchCountByUser = new Map(vouchCounts.map((v) => [v.targetId, v._count.targetId]));
   const passedUserIds = new Set(
@@ -105,16 +124,21 @@ export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed:
         visibility: n.visibility,
       },
       vouchCount: vouchCountByUser.get(n.userId) ?? 0,
+      lifestyle: lifestyleByUser.get(n.userId),
     });
   }
 
   for (const o of otherOffers) {
     if (passedUserIds.has(o.userId)) continue;
     kindByUser.set(o.userId, "offer");
-    candidates.push({ need: offerToNeedLike(o), vouchCount: vouchCountByUser.get(o.userId) ?? 0 });
+    candidates.push({
+      need: offerToNeedLike(o),
+      vouchCount: vouchCountByUser.get(o.userId) ?? 0,
+      lifestyle: lifestyleByUser.get(o.userId),
+    });
   }
 
-  const ranked = generateMatches({ viewerId, viewerNeed, candidates, edges, maxDegree: 3, limit: 20 });
+  const ranked = generateMatches({ viewerId, viewerNeed, candidates, edges, maxDegree: 3, limit: 20, viewerLifestyle });
 
   const userIds = ranked.map((m) => m.userId);
   const viaIds = ranked.map((m) => m.via).filter((id): id is string => !!id);
@@ -139,9 +163,11 @@ export async function getMatchesForUser(viewerId: string): Promise<{ viewerNeed:
       degree: m.degree,
       via: via ? { id: via.id, name: via.name } : null,
       score: m.score,
+      breakdown: m.breakdown,
       vouchCount: vouchCountByUser.get(m.userId) ?? 0,
       action: (actionByUser.get(m.userId) as "INTERESTED" | "PASSED" | undefined) ?? null,
       need: { ...rawByUser.get(m.userId)!, notes: needRow?.notes, description: offerRow?.description, rentAmount: offerRow?.rentAmount },
+      lifestyle: lifestyleByUser.get(m.userId) ?? null,
     };
   });
 

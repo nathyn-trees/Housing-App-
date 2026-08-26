@@ -23,6 +23,9 @@ export default async function NavBar() {
               <Link href="/list-room" className="text-neutral-700 hover:text-brand-600">
                 List a room
               </Link>
+              <Link href="/lifestyle" className="text-neutral-700 hover:text-brand-600">
+                Lifestyle
+              </Link>
               <span className="text-neutral-400">{user.name}</span>
               <LogoutButton />
             </>

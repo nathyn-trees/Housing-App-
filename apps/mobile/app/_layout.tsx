@@ -12,6 +12,7 @@ export default function RootLayout() {
         <Stack.Screen name="signup" options={{ title: "Sign up" }} />
         <Stack.Screen name="matches" options={{ title: "Your matches" }} />
         <Stack.Screen name="need" options={{ title: "What are you looking for?" }} />
+        <Stack.Screen name="lifestyle" options={{ title: "What are you like to live with?" }} />
         <Stack.Screen name="connections" options={{ title: "Your network" }} />
       </Stack>
     </AuthProvider>

@@ -177,6 +177,32 @@ async function main() {
     },
   });
 
+  // Alice and Cara share a near-identical lifestyle (tidy, home a lot, keep
+  // to themselves) despite never having met — while Bob's logistics overlap
+  // reasonably with theirs but his lifestyle is the opposite on every axis.
+  // The point: a grid that shows lifestyle compatibility alongside budget/
+  // timing surfaces that mismatch instead of hiding it behind one score.
+  await prisma.lifestyleProfile.upsert({
+    where: { userId: alice.id },
+    update: {},
+    create: { userId: alice.id, cleanliness: 4, timeAtHome: "OFTEN", hostingGuests: "RARELY", socialStyle: "INTROVERT" },
+  });
+  await prisma.lifestyleProfile.upsert({
+    where: { userId: cara.id },
+    update: {},
+    create: { userId: cara.id, cleanliness: 4, timeAtHome: "OFTEN", hostingGuests: "RARELY", socialStyle: "INTROVERT" },
+  });
+  await prisma.lifestyleProfile.upsert({
+    where: { userId: bob.id },
+    update: {},
+    create: { userId: bob.id, cleanliness: 2, timeAtHome: "RARELY", hostingGuests: "OFTEN", socialStyle: "EXTROVERT" },
+  });
+  await prisma.lifestyleProfile.upsert({
+    where: { userId: dana.id },
+    update: {},
+    create: { userId: dana.id, cleanliness: 5, timeAtHome: "SOMETIMES", hostingGuests: "SOMETIMES", socialStyle: "AMBIVERT" },
+  });
+
   await prisma.vouch.upsert({
     where: { voucherId_targetId: { voucherId: nathyn.id, targetId: alice.id } },
     update: {},

@@ -48,7 +48,7 @@ export default function NeedForm({ defaultCity, existingNeed }: { defaultCity: s
       setError(data.error ?? "Something went wrong.");
       return;
     }
-    router.push("/matches");
+    router.push("/lifestyle");
     router.refresh();
   }
 

@@ -45,7 +45,7 @@ export default function NeedScreen() {
         body: JSON.stringify({ city, neighborhoods, budgetMin, budgetMax, moveInDate, urgency, roomType, notes, visibility: 2 }),
       });
       await refresh();
-      router.replace("/matches");
+      router.replace("/lifestyle");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something went wrong.");
     } finally {

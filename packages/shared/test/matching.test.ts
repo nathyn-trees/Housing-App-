@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateMatches, type NeedLike, type CandidateInput } from "../src/matching";
+import { generateMatches, lifestyleScore, type NeedLike, type CandidateInput, type LifestyleLike } from "../src/matching";
 import type { Edge } from "../src/graph";
 
 function need(overrides: Partial<NeedLike> & { userId: string }): NeedLike {
@@ -87,5 +87,53 @@ describe("generateMatches", () => {
     const matches = generateMatches({ viewerId: "alice", viewerNeed: aliceNeed, candidates, edges });
 
     expect(matches).toHaveLength(0);
+  });
+
+  it("ranks a lifestyle-compatible candidate above an otherwise-identical mismatched one", () => {
+    const viewerNeed = need({ userId: "nathyn" });
+    const viewerLifestyle: LifestyleLike = { cleanliness: 5, timeAtHome: "ALWAYS", hostingGuests: "NEVER", socialStyle: "INTROVERT" };
+    const candidates: CandidateInput[] = [
+      {
+        need: need({ userId: "alice" }),
+        vouchCount: 0,
+        lifestyle: { cleanliness: 5, timeAtHome: "ALWAYS", hostingGuests: "NEVER", socialStyle: "INTROVERT" }, // identical
+      },
+      {
+        need: need({ userId: "bob" }),
+        vouchCount: 0,
+        lifestyle: { cleanliness: 1, timeAtHome: "NEVER", hostingGuests: "ALWAYS", socialStyle: "EXTROVERT" }, // opposite on every axis
+      },
+    ];
+
+    const matches = generateMatches({ viewerId: "nathyn", viewerNeed, candidates, edges, viewerLifestyle });
+
+    expect(matches[0].userId).toBe("alice");
+    expect(matches[0].breakdown.lifestyle).toBe(1);
+    expect(matches[1].breakdown.lifestyle).toBe(0);
+    expect(matches[0].score).toBeGreaterThan(matches[1].score);
+  });
+
+  it("treats a missing lifestyle profile as neutral rather than penalizing it", () => {
+    const viewerNeed = need({ userId: "nathyn" });
+    const viewerLifestyle: LifestyleLike = { cleanliness: 5, timeAtHome: "OFTEN", hostingGuests: "RARELY", socialStyle: "INTROVERT" };
+    const candidates: CandidateInput[] = [{ need: need({ userId: "alice" }), vouchCount: 0 }]; // no lifestyle set
+
+    const matches = generateMatches({ viewerId: "nathyn", viewerNeed, candidates, edges, viewerLifestyle });
+
+    expect(matches[0].breakdown.lifestyle).toBe(0.5);
+  });
+});
+
+describe("lifestyleScore", () => {
+  it("returns neutral when either side is missing", () => {
+    expect(lifestyleScore(undefined, undefined)).toBe(0.5);
+  });
+
+  it("returns 1 for identical profiles and 0 for maximally opposite ones", () => {
+    const a: LifestyleLike = { cleanliness: 5, timeAtHome: "ALWAYS", hostingGuests: "NEVER", socialStyle: "INTROVERT" };
+    const b: LifestyleLike = { cleanliness: 1, timeAtHome: "NEVER", hostingGuests: "ALWAYS", socialStyle: "EXTROVERT" };
+
+    expect(lifestyleScore(a, a)).toBe(1);
+    expect(lifestyleScore(a, b)).toBe(0);
   });
 });

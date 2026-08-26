@@ -39,7 +39,7 @@ export default async function MatchesPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {matches.map((m) => (
             <MatchCard key={m.userId} match={m} />
           ))}
