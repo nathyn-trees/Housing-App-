@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "Nearby",
+    "slug": "nearby-housing",
+    "scheme": "nearby",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.nearby.housing" },
+    "android": { "package": "com.nearby.housing" },
+    "plugins": ["expo-router"]
+  }
+}

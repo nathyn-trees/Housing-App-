@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite for local/dev simplicity. Swap to "postgresql" + DATABASE_URL for production.
+  // SQLite has no native enum support, so status/type fields below are plain
+  // strings validated at the application layer (see packages/shared types).
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  bio          String?
+  city         String?
+  createdAt    DateTime @default(now())
+
+  need   HousingNeed?
+  offer  HousingOffer?
+
+  vouchesGiven    Vouch[] @relation("VouchesGiven")
+  vouchesReceived Vouch[] @relation("VouchesReceived")
+
+  connectionsA ConnectionRequest[] @relation("ConnectionsA")
+  connectionsB ConnectionRequest[] @relation("ConnectionsB")
+
+  matchActionsAsA MatchAction[] @relation("MatchActionsA")
+  matchActionsAsB MatchAction[] @relation("MatchActionsB")
+}
+
+// An edge in the trust graph. Undirected in meaning (userA <-> userB) once ACCEPTED;
+// userAId is always the requester at creation time.
+// status: "PENDING" | "ACCEPTED"
+model ConnectionRequest {
+  id          String    @id @default(cuid())
+  userAId     String
+  userBId     String
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  respondedAt DateTime?
+
+  userA User @relation("ConnectionsA", fields: [userAId], references: [id])
+  userB User @relation("ConnectionsB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId])
+}
+
+// "I need a place / roommate" — the primary object in the app. Kept private by
+// default; only surfaced to people within `visibility` degrees of separation.
+// urgency: "FLEXIBLE" | "SOON" | "URGENT"
+// roomType: "ANY" | "PRIVATE_ROOM" | "SHARED_ROOM" | "ENTIRE_PLACE"
+// status: "ACTIVE" | "PAUSED" | "FOUND"
+model HousingNeed {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  city          String
+  neighborhoods String? // comma-separated, free text
+  budgetMin     Int
+  budgetMax     Int
+  moveInDate    DateTime
+  urgency       String   @default("FLEXIBLE")
+  roomType      String   @default("ANY")
+  amenities     String? // comma-separated, free text
+  notes         String?
+  visibility    Int      @default(2) // max degrees of separation this need is discoverable within
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// "I have a room / lease to share" — mirror of HousingNeed for people offering
+// space rather than seeking it.
+// roomType: "ANY" | "PRIVATE_ROOM" | "SHARED_ROOM" | "ENTIRE_PLACE"
+// status: "ACTIVE" | "PAUSED" | "FOUND"
+model HousingOffer {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id])
+  city          String
+  neighborhood  String?
+  rentAmount    Int
+  availableDate DateTime
+  roomType      String   @default("PRIVATE_ROOM")
+  amenities     String?
+  description   String?
+  visibility    Int      @default(2)
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// A trust signal: "I know this person and can vouch for them as a roommate."
+model Vouch {
+  id        String   @id @default(cuid())
+  voucherId String
+  targetId  String
+  note      String
+  createdAt DateTime @default(now())
+
+  voucher User @relation("VouchesGiven", fields: [voucherId], references: [id])
+  target  User @relation("VouchesReceived", fields: [targetId], references: [id])
+
+  @@unique([voucherId, targetId])
+}
+
+// Records a user's reaction to a suggested match so it can be excluded/promoted
+// on future computations (matches themselves are computed on demand, not stored).
+// action: "INTERESTED" | "PASSED"
+model MatchAction {
+  id        String   @id @default(cuid())
+  userAId   String
+  userBId   String
+  actorId   String
+  action    String
+  createdAt DateTime @default(now())
+
+  userA User @relation("MatchActionsA", fields: [userAId], references: [id])
+  userB User @relation("MatchActionsB", fields: [userBId], references: [id])
+
+  @@unique([userAId, userBId, actorId])
+}
